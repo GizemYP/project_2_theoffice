@@ -1,7 +1,11 @@
 import os
-
+import psycopg2
 import pandas as pd
-import numpy as np
+import matplotlib
+from matplotlib import style
+style.use('seaborn')
+import matplotlib.pyplot as plt
+import csv
 
 import sqlalchemy
 from sqlalchemy.ext.automap import automap_base
@@ -18,18 +22,8 @@ app = Flask(__name__)
 # Database Setup
 #################################################
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///db/bellybutton.sqlite"
+app.config["SQLALCHEMY_DATABASE_URI"] = 'postgresql+psycopg2://koxrqvuuxugccs:6878ba0790ec132289e57f3ed6daa22ada7e6368bea3a7489f4c03cb2bfb9ff1@ec2-174-129-214-42.compute-1.amazonaws.com/d64jo158fls6ag'
 db = SQLAlchemy(app)
-
-# reflect an existing database into a new model
-Base = automap_base()
-# reflect the tables
-Base.prepare(db.engine, reflect=True)
-
-# Save references to each table
-Samples_Metadata = Base.classes.sample_metadata
-Samples = Base.classes.samples
-
 
 @app.route("/")
 def index():
@@ -37,20 +31,41 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/names")
+@app.route("/episodes")
 def names():
     """Return a list of sample names."""
 
     # Use Pandas to perform the sql query
-    stmt = db.session.query(Samples).statement
-    df = pd.read_sql_query(stmt, db.session.bind)
+    main_df_i = pd.read_sql('''
+	select
+	l.s0e0,
+	speaker,
+	line_text,
+	p.ep_id,
+	title,
+	synopsis,
+	imdb_rating
+	from lines l
+	join prim_key p
+		on p.s0e0 = l.s0e0
+	join metadata m
+		on p.ep_id = m.episode_no
+	''', db)
+
+    episodes = main_df_i["s0e0"].unique()
 
     # Return a list of the column names (sample names)
-    return jsonify(list(df.columns)[2:])
+    return jsonify(episodes[0])
 
 @app.route("/samples")
 def samples(sample):
     """Return `otu_ids`, `otu_labels`,and `sample_values`."""
+
+	#main_df_top_cast = main_df_i.groupby(['speaker']).sum().sort_values(by="line_text", ascending=False).reset_index()
+	#cast_df = main_df_top_cast.loc[main_df_top_cast['line_text'] > 150]
+	#top_cast = cast_df['speaker'].values
+	#main_df_f = main_df_i[main_df_i['speaker'].isin(top_cast)]
+
     stmt = db.session.query(Samples).statement
     df = pd.read_sql_query(stmt, db.session.bind)
 
